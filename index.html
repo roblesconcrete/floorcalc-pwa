@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Floor Pricing Calculator</title>
+
+  <!-- PWA basics -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#ffffff">
+
+  <!-- iOS PWA full-screen support -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FloorCalc">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <script>
+    // Register the service worker (works when served over HTTPS or localhost)
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").catch(console.error);
+      });
+    }
+
+    // Optional: 'Install' button for Android/desktop Chrome
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.style.display = 'inline-flex';
+    });
+    async function installPWA(){
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      const btn = document.getElementById('installBtn');
+      if (btn) btn.style.display = 'none';
+      console.log('Install outcome:', outcome);
+    }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <img src="icons/icon-192.png" alt="" class="logo">
+    <h1>Floor Pricing Calculator</h1>
+    <button id="installBtn" class="btn" onclick="installPWA()" style="display:none">Install App</button>
+  </header>
+
+  <main id="app" class="container">
+    <!-- ✅ Replace EVERYTHING inside <main> with your existing calculator HTML -->
+    <div class="card">
+      <h2>Your Calculator Goes Here</h2>
+      <p>Paste your existing calculator HTML here. Keep the <strong>head</strong> above as-is for PWA features.</p>
+      <button class="btn" onclick="demoCalculate()">Demo Calculate</button>
+      <pre id="result"></pre>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>© <span id="year"></span> Your Company</p>
+  </footer>
+
+  <!-- Your scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
