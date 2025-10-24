@@ -12,6 +12,7 @@ const ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-180.png'
+  ./pricing.json
 ];
 
 self.addEventListener('install', (event) => {
