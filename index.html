@@ -1,840 +1,666 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Floor Pricing Calculator</title>
-
-  <!-- PWA basics -->
-  <link rel="manifest" href="manifest.webmanifest" />
-  <meta name="theme-color" content="#000000" />
-
-  <!-- iOS PWA full-screen support -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="FloorCalc" />
-  <link rel="apple-touch-icon" href="icons/icon-180.png" />
-
-  <!-- Tailwind (so your existing classes still work) -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- React + ReactDOM (UMD) -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <!-- Babel for in-browser JSX transform -->
-  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-
-  <!-- EmailJS (browser) -->
-  <script src="https://unpkg.com/@emailjs/browser@4/dist/email.min.js"></script>
-
-  <!-- Your base styles (optional) -->
-  <link rel="stylesheet" href="styles.css" />
-
-  <script>
-    // Register the service worker (works on HTTPS / GitHub Pages)
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js").catch(console.error);
-      });
-    }
-
-    // Optional: 'Install' button for Android/desktop Chrome
-    let deferredPrompt;
-    window.addEventListener("beforeinstallprompt", (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const btn = document.getElementById("installBtn");
-      if (btn) btn.style.display = "inline-flex";
-    });
-    async function installPWA() {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      const btn = document.getElementById("installBtn");
-      if (btn) btn.style.display = "none";
-    }
-  </script>
-</head>
-<body class="bg-white text-neutral-900">
-  <header class="site-header flex items-center gap-3 p-3 border-b border-neutral-200 bg-white">
-    <img src="icons/icon-192.png" alt="" class="logo w-7 h-7 rounded-lg" />
-    <h1 class="text-lg font-semibold">Floor Pricing Calculator</h1>
-    <button id="installBtn" class="btn ml-auto border border-neutral-300 rounded-full px-4 py-2 text-sm"
-            onclick="installPWA()" style="display:none">Install App</button>
-  </header>
-
-  <main id="app" class="container p-4">
-    <div id="root"></div>
-  </main>
-
-  <footer class="site-footer p-3 border-t border-neutral-200">
-    <p class="text-sm text-neutral-600">© <span id="year"></span> Robles Concrete Polishing &amp; Coatings</p>
-  </footer>
-
-  <script>
-    document.getElementById("year").textContent = new Date().getFullYear();
-  </script>
-
-  <!-- === Your React app (converted from pages/index.js) === -->
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    // Initialize EmailJS (public key can also be passed in send(); keeping same flow as your code)
-    // emailjs.init("577XB4nzIHzauM_lg"); // optional init
-
-    function ImageHeader() {
-      // Omit external images to avoid 404; keep minimal spacer on mobile
-      return <div className="block sm:hidden w-full border-b border-neutral-200" />;
-    }
-
-    function Footer() {
-      return (
-        <footer className="w-full bg-gradient-to-b from-white to-neutral-50 py-6 border-t border-neutral-100 mt-8">
-          <div className="max-w-6xl mx-auto px-6 text-center text-neutral-500 text-sm">
-            App Development By Zazen Designs
-          </div>
-        </footer>
-      );
-    }
-
-    function AppShell({ onLogout, isAdmin }) {
-      // Client / project
-      const [clientName, setClientName] = useState("");
-      const [clientEmail, setClientEmail] = useState("");
-      const [companyName, setCompanyName] = useState("");
-      const [companyLocation, setCompanyLocation] = useState("");
-      const [projectName, setProjectName] = useState("");
-      const [flooringType, setFlooringType] = useState("");
-
-      // Live pricing data
-      const [pricingData, setPricingData] = useState(null);
-      const [priceLoading, setPriceLoading] = useState(false);
-
-      // Email state
-      const [emailSending, setEmailSending] = useState(false);
-      const [emailError, setEmailError] = useState("");
-      const [emailSuccess, setEmailSuccess] = useState(false);
-
-      // Fetch pricing JSON from static file on GitHub Pages
-      useEffect(() => {
-        setPriceLoading(true);
-        fetch("pricing.json")
-          .then((r) => r.json())
-          .then((d) => { setPricingData(d); setPriceLoading(false); })
-          .catch((err) => { console.error("Failed to fetch pricing:", err); setPriceLoading(false); });
-      }, []);
-
-      // Concrete states
-      const [concreteAge, setConcreteAge] = useState("");
-      const [location, setLocation] = useState("");
-      const [serviceType, setServiceType] = useState("");
-      const [sqft, setSqft] = useState("");
-      const [rooms, setRooms] = useState("");
-      const [color, setColor] = useState("");
-      const [gloss, setGloss] = useState("");
-      const [epoxySystem, setEpoxySystem] = useState("");
-      const [integralCove, setIntegralCove] = useState("");
-      const [linearFeet, setLinearFeet] = useState("");
-
-      // Terrazzo states
-      const [tzChip, setTzChip] = useState("");
-      const [tzSqft, setTzSqft] = useState("");
-      const [tzRooms, setTzRooms] = useState("");
-
-      // Misc
-      const [finalComments, setFinalComments] = useState("");
-      const [acceptDisclaimer, setAcceptDisclaimer] = useState(false);
-
-      const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-      const canSend =
-        clientName && clientEmail && isValidEmail(clientEmail) &&
-        companyName && companyLocation && projectName && flooringType && acceptDisclaimer;
-
-      const resetAll = () => {
-        setConcreteAge(""); setLocation(""); setServiceType(""); setSqft(""); setRooms("");
-        setColor(""); setGloss(""); setEpoxySystem(""); setIntegralCove(""); setLinearFeet("");
-        setTzChip(""); setTzSqft(""); setTzRooms(""); setFinalComments("");
-      };
-      const resetForm = () => {
-        setClientName(""); setClientEmail(""); setCompanyName(""); setCompanyLocation("");
-        setProjectName(""); setFlooringType(""); setAcceptDisclaimer(false);
-        setEmailSuccess(false); setEmailError(""); resetAll();
-      };
-
-      const pretty = (v) => (v ? String(v).trim() : "");
-      const label = (k, map) => (k && map[k]) || k || "";
-
-      const summary = (() => {
-        if (!flooringType) return "";
-        if (flooringType === "Concrete") {
-          const colorLabel = label(color, { natural: "Natural", stain: "Stain" });
-          const gritLabel = gloss ? gloss.replace("grit_", "") + " Grit" : "";
-          const epoxyLabel = label(epoxySystem, { single: "Single", metallic: "Metallic", quartz: "Quartz", flake: "Color Flake" });
-          const parts = ["Concrete", pretty(concreteAge), pretty(location), pretty(serviceType),
-                         sqft ? `${sqft} sq ft` : "", rooms ? `${rooms} rooms` : ""];
-          if (serviceType === "Polished Concrete") parts.push(colorLabel, gritLabel);
-          if (serviceType === "Sealed Concrete") parts.push(colorLabel);
-          if (serviceType === "Epoxy") parts.push(epoxyLabel, integralCove ? `Cove: ${integralCove}${integralCove === "yes" && linearFeet ? ` (${linearFeet} lf)` : ""}` : "");
-          return parts.filter(Boolean).join(" • ");
-        }
-        if (flooringType === "Terrazzo") {
-          return ["Terrazzo", tzChip ? `Chip: ${tzChip === "standard" ? "Standard" : "Large"}` : "",
-                  tzSqft ? `${tzSqft} sq ft` : "", tzRooms ? `${tzRooms} rooms` : ""].filter(Boolean).join(" • ");
-        }
-        return flooringType;
-      })();
-
-      const calculatePrice = () => {
-        if (!pricingData || !flooringType) return null;
-        const { pricing, ranges, settings } = pricingData;
-        let breakdown = []; let total = 0;
-        try {
-          if (flooringType === "Concrete") {
-            const area = parseFloat(sqft) || 0; if (area === 0) return null;
-            let tier = null;
-
-            if (serviceType === "Polished Concrete" && pricing.polished_concrete) {
-              for (const [t, data] of Object.entries(pricing.polished_concrete)) {
-                if (area >= data.min && area <= data.max) { tier = t; break; }
-              }
-              if (tier && pricing.polished_concrete[tier]) {
-                const tierData = pricing.polished_concrete[tier];
-                const pricePerSqft = tierData[gloss] || 0;
-                const basePrice = area * pricePerSqft;
-                breakdown.push({ label: `Polished Concrete (${gloss.replace("grit_", "")} Grit, ${area} sq ft)`,
-                                 amount: basePrice, perSqft: pricePerSqft, sqft: area });
-                total += basePrice;
-                if (color === "stain" && settings.stain_polished) {
-                  breakdown.push({ label: "Stain Surcharge", amount: settings.stain_polished });
-                  total += settings.stain_polished;
-                }
-              }
-            } else if (serviceType === "Sealed Concrete" && pricing.sealed_concrete) {
-              for (const [t, data] of Object.entries(pricing.sealed_concrete)) {
-                if (area >= data.min && data.max && area <= data.max) { tier = t; break; }
-              }
-              if (tier && pricing.sealed_concrete[tier]) {
-                const pricePerSqft = pricing.sealed_concrete[tier].base || 0;
-                const basePrice = area * pricePerSqft;
-                breakdown.push({ label: `Sealed Concrete (${area} sq ft)`,
-                                 amount: basePrice, perSqft: pricePerSqft, sqft: area });
-                total += basePrice;
-                if (color === "stain" && settings.stain_sealed) {
-                  breakdown.push({ label: "Stain Surcharge", amount: settings.stain_sealed });
-                  total += settings.stain_sealed;
-                }
-              }
-            } else if (serviceType === "Epoxy" && pricing.epoxy) {
-              const toNum = (x) => { const n = parseFloat(String(x ?? "").trim()); return Number.isFinite(n) ? n : 0; };
-              const get = (obj, k) => { const kk = Object.keys(obj || {}).find((q)=>q.trim().toLowerCase()===k); return kk?obj[kk]:undefined; };
-              for (const [t, band] of Object.entries(ranges?.epoxy || {})) {
-                const min = band.min ?? -Infinity, max = band.max ?? Infinity;
-                if (area >= min && area <= max) { tier = t; break; }
-              }
-              if (!tier) {
-                for (const [t, band] of Object.entries(pricing.epoxy || {})) {
-                  const min = band.min ?? -Infinity, max = band.max ?? Infinity;
-                  if (area >= min && area <= max) { tier = t; break; }
-                }
-              }
-              if (tier && pricing.epoxy[tier]) {
-                const tierData = pricing.epoxy[tier];
-                const systemKey = String(epoxySystem || "").trim().toLowerCase();
-                const pricePerSqft = toNum(get(tierData, systemKey));
-                if (pricePerSqft > 0) {
-                  const basePrice = area * pricePerSqft;
-                  breakdown.push({ label: `Epoxy ${systemKey==="single"?"Single Color":systemKey.charAt(0).toUpperCase()+systemKey.slice(1)} (${area} sq ft)`,
-                                   amount: basePrice, perSqft: pricePerSqft, sqft: area });
-                  total += basePrice;
-                  if (integralCove === "yes" && linearFeet && settings.integral_cove_per_lf) {
-                    const lf = parseFloat(linearFeet) || 0;
-                    const perLf = toNum(settings.integral_cove_per_lf);
-                    if (lf > 0 && perLf > 0) {
-                      const covePrice = lf * perLf;
-                      breakdown.push({ label: `Integral Cove (${lf} lf)`, amount: covePrice, perUnit: perLf, unit: "lf" });
-                      total += covePrice;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benjamin's Mobile Detailing - Professional Quote Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-bg': '#0f172a',
+                        'dark-card': '#1e293b',
+                        'dark-input': '#334155',
+                        'accent-blue': '#3b82f6',
+                        'accent-cyan': '#06b6d4'
                     }
-                  }
                 }
-              }
-            } else if ((serviceType === "Micro-Topping" || serviceType === "Driveway Resurfacing") && pricing.other) {
-              const area2 = area; let tier2 = null;
-              for (const [t, data] of Object.entries(ranges.other || {})) {
-                if (area2 >= data.min && area2 <= data.max) { tier2 = t; break; }
-              }
-              const key = serviceType === "Micro-Topping" ? "micro_topping" : "driveway";
-              if (tier2 && pricing.other[key]?.[tier2]) {
-                const ppsf = pricing.other[key][tier2];
-                const basePrice = area2 * ppsf;
-                breakdown.push({ label: `${serviceType} (${area2} sq ft)`, amount: basePrice, perSqft: ppsf, sqft: area2 });
-                total += basePrice;
-              }
             }
-          } else if (flooringType === "Terrazzo") {
-            const area = parseFloat(tzSqft) || 0; if (area === 0) return null;
-            let tier = null;
-            for (const [t, data] of Object.entries(ranges.other || {})) {
-              if (area >= data.min && area <= data.max) { tier = t; break; }
-            }
-            if (tier && pricing.other?.terrazzo?.[tier]) {
-              const ppsf = pricing.other.terrazzo[tier];
-              const basePrice = area * ppsf;
-              breakdown.push({ label: `Terrazzo (${area} sq ft)`, amount: basePrice, perSqft: ppsf, sqft: area });
-              total += basePrice;
-            }
-          }
-        } catch (e) { console.error(e); return null; }
-        if (total === 0) return null;
-        return { breakdown, total };
-      };
-
-      const priceInfo = calculatePrice();
-
-      const sendEmail = async () => {
-        setEmailSending(true); setEmailError(""); setEmailSuccess(false);
-        const labelMap = { single:"Single", metallic:"Metallic", quartz:"Quartz", flake:"Color Flake" };
-        let projectDetails = `${summary}\n\n`;
-        if (flooringType === "Concrete") {
-          if (concreteAge) projectDetails += `- Age: ${concreteAge}\n`;
-          if (location) projectDetails += `- Location: ${location}\n`;
-          if (serviceType) projectDetails += `- Service: ${serviceType}\n`;
-          if (sqft) projectDetails += `- Square Footage: ${sqft} sq ft\n`;
-          if (rooms) projectDetails += `- Number of Rooms: ${rooms}\n`;
-          if (color) projectDetails += `- Color: ${color === "stain" ? "Stain" : "Natural"}\n`;
-          if (gloss) projectDetails += `- Grit Level: ${gloss.replace("grit_","")} Grit\n`;
-          if (epoxySystem) projectDetails += `- Epoxy System: ${labelMap[epoxySystem]}\n`;
-          if (integralCove === "yes") {
-            projectDetails += `- Integral Cove: Yes\n`;
-            if (linearFeet) projectDetails += `- Linear Feet: ${linearFeet} lf\n`;
-          }
-        } else if (flooringType === "Terrazzo") {
-          if (tzChip) projectDetails += `- Chip Size: ${tzChip === "standard" ? "Standard" : "Large"}\n`;
-          if (tzSqft) projectDetails += `- Square Footage: ${tzSqft} sq ft\n`;
-          if (tzRooms) projectDetails += `- Number of Rooms: ${tzRooms}\n`;
         }
-        if (finalComments) projectDetails += `\nAdditional Comments:\n${finalComments}\n`;
+    </script>
+</head>
+<body class="bg-dark-bg text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8 max-w-7xl">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-2">Professional Mobile Detailing Quote</h1>
+            <p class="text-slate-400 text-lg">Get an exact price for your vehicle detailing service</p>
+        </div>
 
-        let pricingBreakdown = "Pricing will be calculated and provided separately.";
-        if (priceInfo) {
-          pricingBreakdown = "PRICING BREAKDOWN:\n\n";
-          priceInfo.breakdown.forEach((item) => {
-            pricingBreakdown += `${item.label}: $${item.amount.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}\n`;
-            if (item.perSqft) pricingBreakdown += `  ($${item.perSqft.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}/sq ft x ${item.sqft} sq ft)\n`;
-          });
-          pricingBreakdown += `\nTOTAL: $${priceInfo.total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-        }
+        <!-- Main Content Grid -->
+        <div class="grid lg:grid-cols-2 gap-8">
+            <!-- Left Column - Form -->
+            <div class="space-y-6">
+                <!-- Vehicle Information -->
+                <div class="bg-dark-card border border-slate-600 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-white mb-4">Vehicle Information</h2>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Year</label>
+                            <select id="year" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" required>
+                                <option value="">Select Year</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Make</label>
+                            <select id="make" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" required>
+                                <option value="">Select Make</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Model</label>
+                            <select id="model" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" required>
+                                <option value="">Select Model</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Body Type</label>
+                            <select id="bodyType" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" required>
+                                <option value="">Select Body Type</option>
+                                <option value="sedan">Sedan</option>
+                                <option value="suv">SUV</option>
+                                <option value="truck">Truck</option>
+                                <option value="3rdrow">3rd Row Seat Vehicle</option>
+                                <option value="coupe">Coupe</option>
+                                <option value="convertible">Convertible</option>
+                                <option value="hatchback">Hatchback</option>
+                                <option value="wagon">Wagon</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
 
-        const templateParams = {
-          client_name: clientName,
-          client_email: clientEmail,
-          company_name: companyName || "N/A",
-          company_location: companyLocation || "N/A",
-          project_name: projectName || "N/A",
-          flooring_type: flooringType,
-          project_summary: summary,
-          project_details: projectDetails,
-          pricing_breakdown: pricingBreakdown,
-          disclaimer: "Estimates provided are valid for a 75 mile radius around Central Atlanta."
+                <!-- Service Packages -->
+                <div class="bg-dark-card border border-slate-600 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-white mb-4">Select Service Package</h2>
+                    
+                    <!-- Express Full Detail -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="express-full" name="service" value="express-full" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="express-full" class="ml-3 text-lg font-medium text-white">Express Full Detail</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">2 Hours • Complete exterior wash, interior vacuum & wipe down</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div class="text-slate-300">Sedan: <span class="text-white font-medium">$150</span></div>
+                            <div class="text-slate-300">SUV: <span class="text-white font-medium">$170</span></div>
+                            <div class="text-slate-300">Truck: <span class="text-white font-medium">$170</span></div>
+                            <div class="text-slate-300">3rd Row: <span class="text-white font-medium">$180</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Deluxe Full Detail -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="deluxe-full" name="service" value="deluxe-full" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="deluxe-full" class="ml-3 text-lg font-medium text-white">Deluxe Full Detail</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">3 Hours • Full service with interior deep clean, seat shampoo & conditioning</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div class="text-slate-300">Sedan: <span class="text-white font-medium">$250</span></div>
+                            <div class="text-slate-300">SUV: <span class="text-white font-medium">$270</span></div>
+                            <div class="text-slate-300">Truck: <span class="text-white font-medium">$270</span></div>
+                            <div class="text-slate-300">3rd Row: <span class="text-white font-medium">$280</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Express Interior -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="express-interior" name="service" value="express-interior" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="express-interior" class="ml-3 text-lg font-medium text-white">Express Interior Detail</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">1.5 Hours • Vacuum, wipe surfaces, glass cleaning</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div class="text-slate-300">Sedan: <span class="text-white font-medium">$100</span></div>
+                            <div class="text-slate-300">SUV: <span class="text-white font-medium">$120</span></div>
+                            <div class="text-slate-300">Truck: <span class="text-white font-medium">$120</span></div>
+                            <div class="text-slate-300">3rd Row: <span class="text-white font-medium">$140</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Deluxe Interior -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="deluxe-interior" name="service" value="deluxe-interior" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="deluxe-interior" class="ml-3 text-lg font-medium text-white">Deluxe Interior Detail</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">2.5 Hours • Deep clean, shampoo, conditioning, leather treatment</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div class="text-slate-300">Sedan: <span class="text-white font-medium">$200</span></div>
+                            <div class="text-slate-300">SUV: <span class="text-white font-medium">$220</span></div>
+                            <div class="text-slate-300">Truck: <span class="text-white font-medium">$220</span></div>
+                            <div class="text-slate-300">3rd Row: <span class="text-white font-medium">$240</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Express Exterior -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="express-exterior" name="service" value="express-exterior" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="express-exterior" class="ml-3 text-lg font-medium text-white">Express Exterior Detail</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">1 Hour • Wash, rinse, dry, basic protection</p>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div class="text-slate-300">Sedan: <span class="text-white font-medium">$70</span></div>
+                            <div class="text-slate-300">SUV: <span class="text-white font-medium">$90</span></div>
+                            <div class="text-slate-300">Truck: <span class="text-white font-medium">$90</span></div>
+                            <div class="text-slate-300">3rd Row: <span class="text-white font-medium">$100</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Ceramic Coating -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="ceramic-coating" name="service" value="ceramic-coating" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="ceramic-coating" class="ml-3 text-lg font-medium text-white">3-5 Year Ceramic Coating</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">8 Hours • Premium paint protection with long-lasting shine</p>
+                        <div class="text-sm">
+                            <div class="text-slate-300">Starting at: <span class="text-white font-medium">$950</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Paint Correction -->
+                    <div class="mb-6 border border-slate-600 rounded-lg p-4">
+                        <div class="flex items-center mb-3">
+                            <input type="radio" id="paint-correction" name="service" value="paint-correction" class="text-accent-blue focus:ring-accent-blue">
+                            <label for="paint-correction" class="ml-3 text-lg font-medium text-white">1 Step Paint Correction</label>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-3">4 Hours • Remove swirls, light scratches, enhance gloss</p>
+                        <div class="text-sm">
+                            <div class="text-slate-300">Starting at: <span class="text-white font-medium">$400</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Services / Upcharges -->
+                <div class="bg-dark-card border border-slate-600 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold text-white mb-4">Additional Considerations</h2>
+                    <p class="text-slate-400 text-sm mb-4">Select any that apply to your vehicle for accurate pricing:</p>
+                    
+                    <div class="space-y-3">
+                        <label class="flex items-center">
+                            <input type="checkbox" id="pet-hair" value="100" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Excessive pet hair removal</span>
+                            <span class="ml-auto text-slate-300">+$100</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="trash-debris" value="30" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Excessive trash/debris removal</span>
+                            <span class="ml-auto text-slate-300">+$30</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="dirt-grime" value="100" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Excessive dirt and grime</span>
+                            <span class="ml-auto text-slate-300">+$100</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="odor" value="75" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Excessive odor treatment</span>
+                            <span class="ml-auto text-slate-300">+$75</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="mold" value="100" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Mold removal (exterior)</span>
+                            <span class="ml-auto text-slate-300">+$100</span>
+                        </label>
+                        
+                        <label class="flex items-center">
+                            <input type="checkbox" id="lifted-vehicle" value="100" class="text-accent-blue focus:ring-accent-blue">
+                            <span class="ml-3 text-white">Lifted truck/SUV (height surcharge)</span>
+                            <span class="ml-auto text-slate-300">+$100</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column - Pricing Summary -->
+            <div class="space-y-6">
+                <!-- Live Pricing Display -->
+                <div class="bg-dark-card border border-slate-600 rounded-lg p-6 sticky top-8">
+                    <h2 class="text-xl font-semibold text-white mb-4">Live Project Pricing</h2>
+                    <div class="bg-gradient-to-r from-accent-blue to-accent-cyan rounded-lg p-6 text-white">
+                        <div class="text-center">
+                            <div class="text-lg font-medium mb-2">Total Project Estimate</div>
+                            <div class="text-4xl font-bold" id="totalPrice">$0.00</div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Base Service</span>
+                            <span class="text-white font-medium" id="basePrice">$0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300">Additional Services</span>
+                            <span class="text-white font-medium" id="additionalPrice">$0.00</span>
+                        </div>
+                        <div class="border-t border-slate-600 pt-4">
+                            <div class="flex justify-between items-center text-lg font-semibold">
+                                <span class="text-white">Total Amount</span>
+                                <span class="text-accent-cyan" id="finalPrice">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="serviceDetails" class="mt-6 text-sm text-slate-400">
+                        <p>Select a service package and vehicle details to see pricing breakdown.</p>
+                    </div>
+
+                    <button id="submitBtn" disabled class="w-full mt-6 bg-gradient-to-r from-accent-blue to-accent-cyan text-white font-semibold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all">
+                        Send Estimate Request
+                    </button>
+                </div>
+
+                <!-- Contact Information -->
+                <div class="bg-dark-card border border-slate-600 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-white mb-4">Contact Details</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Name</label>
+                            <input type="text" id="clientName" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" placeholder="Your full name" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Email</label>
+                            <input type="email" id="clientEmail" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" placeholder="your@email.com" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Phone</label>
+                            <input type="tel" id="clientPhone" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" placeholder="(555) 123-4567" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Preferred Date & Time</label>
+                            <input type="datetime-local" id="preferredDateTime" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Service Location</label>
+                            <input type="text" id="serviceLocation" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" placeholder="Address where service will be performed" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Additional Notes</label>
+                            <textarea id="additionalNotes" rows="3" class="w-full bg-dark-input border border-slate-500 text-white rounded-lg px-3 py-2 focus:border-accent-blue focus:ring-1 focus:ring-accent-blue" placeholder="Any specific requests or concerns about your vehicle..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Car data
+        const carData = {
+            years: [],
+            makes: {
+                'Acura': ['ILX', 'TLX', 'RLX', 'MDX', 'RDX', 'NSX', 'Integra'],
+                'Audi': ['A3', 'A4', 'A5', 'A6', 'A7', 'A8', 'Q3', 'Q5', 'Q7', 'Q8', 'TT', 'R8', 'e-tron GT'],
+                'BMW': ['2 Series', '3 Series', '4 Series', '5 Series', '6 Series', '7 Series', 'X1', 'X3', 'X4', 'X5', 'X6', 'X7', 'Z4', 'i3', 'i4', 'iX'],
+                'Buick': ['Encore', 'Encore GX', 'Envision', 'Enclave'],
+                'Cadillac': ['CT4', 'CT5', 'XT4', 'XT5', 'XT6', 'Escalade', 'Lyriq'],
+                'Chevrolet': ['Spark', 'Sonic', 'Cruze', 'Malibu', 'Camaro', 'Corvette', 'Trax', 'Trailblazer', 'Equinox', 'Blazer', 'Traverse', 'Tahoe', 'Suburban', 'Colorado', 'Silverado 1500', 'Silverado 2500HD', 'Silverado 3500HD'],
+                'Chrysler': ['300', 'Pacifica'],
+                'Dodge': ['Charger', 'Challenger', 'Journey', 'Durango', 'Ram 1500', 'Ram 2500', 'Ram 3500'],
+                'Ford': ['Fiesta', 'Focus', 'Fusion', 'Mustang', 'Taurus', 'EcoSport', 'Escape', 'Bronco Sport', 'Edge', 'Explorer', 'Expedition', 'Maverick', 'Ranger', 'F-150', 'F-250', 'F-350', 'Mustang Mach-E', 'F-150 Lightning'],
+                'Genesis': ['G70', 'G80', 'G90', 'GV60', 'GV70', 'GV80'],
+                'GMC': ['Canyon', 'Sierra 1500', 'Sierra 2500HD', 'Sierra 3500HD', 'Terrain', 'Acadia', 'Yukon', 'Hummer EV'],
+                'Honda': ['Fit', 'Civic', 'Insight', 'Accord', 'CR-V', 'Passport', 'Pilot', 'HR-V', 'Ridgeline'],
+                'Hyundai': ['Accent', 'Elantra', 'Sonata', 'Veloster', 'Tucson', 'Santa Fe', 'Palisade', 'Kona', 'Nexo', 'Ioniq 5', 'Ioniq 6'],
+                'Infiniti': ['Q50', 'Q60', 'QX50', 'QX55', 'QX60', 'QX80'],
+                'Jaguar': ['XE', 'XF', 'F-TYPE', 'E-PACE', 'F-PACE', 'I-PACE'],
+                'Jeep': ['Compass', 'Cherokee', 'Grand Cherokee', 'Wrangler', 'Gladiator', 'Renegade', 'Grand Wagoneer', 'Wagoneer'],
+                'Kia': ['Rio', 'Forte', 'K5', 'Stinger', 'Soul', 'Seltos', 'Sportage', 'Sorento', 'Telluride', 'Carnival', 'Niro', 'EV6'],
+                'Land Rover': ['Discovery Sport', 'Discovery', 'Range Rover Evoque', 'Range Rover Velar', 'Range Rover Sport', 'Range Rover', 'Defender'],
+                'Lexus': ['IS', 'ES', 'GS', 'LS', 'RC', 'LC', 'UX', 'NX', 'RX', 'GX', 'LX', 'RZ'],
+                'Lincoln': ['Corsair', 'Nautilus', 'Aviator', 'Navigator'],
+                'Mazda': ['Mazda3', 'Mazda6', 'MX-5 Miata', 'CX-30', 'CX-5', 'CX-50', 'CX-9', 'CX-90', 'MX-30'],
+                'Mercedes-Benz': ['A-Class', 'C-Class', 'E-Class', 'S-Class', 'CLA', 'CLS', 'SL', 'AMG GT', 'GLA', 'GLB', 'GLC', 'GLE', 'GLS', 'G-Class', 'EQS', 'EQE', 'EQB', 'EQA'],
+                'MINI': ['Cooper', 'Cooper Clubman', 'Cooper Countryman'],
+                'Mitsubishi': ['Mirage', 'Eclipse Cross', 'Outlander', 'Outlander Sport'],
+                'Nissan': ['Versa', 'Sentra', 'Altima', 'Maxima', 'Z', 'GT-R', 'Kicks', 'Rogue', 'Murano', 'Pathfinder', 'Armada', 'Titan', 'Frontier', 'Ariya', 'Leaf'],
+                'Polestar': ['Polestar 2', 'Polestar 3'],
+                'Porsche': ['718 Boxster', '718 Cayman', '911', 'Panamera', 'Macan', 'Cayenne', 'Taycan'],
+                'Ram': ['1500', '2500', '3500', 'ProMaster City', 'ProMaster'],
+                'Rivian': ['R1T', 'R1S'],
+                'Subaru': ['Impreza', 'Legacy', 'WRX', 'BRZ', 'Crosstrek', 'Forester', 'Outback', 'Ascent', 'Solterra'],
+                'Tesla': ['Model 3', 'Model S', 'Model X', 'Model Y'],
+                'Toyota': ['Corolla', 'Camry', 'Avalon', 'Prius', 'GR86', 'Supra', 'C-HR', 'RAV4', 'Venza', 'Highlander', 'Land Cruiser', 'Sequoia', 'Tacoma', 'Tundra', '4Runner', 'Sienna', 'bZ4X'],
+                'Volkswagen': ['Jetta', 'Passat', 'Arteon', 'Golf', 'Tiguan', 'Atlas', 'ID.4'],
+                'Volvo': ['S60', 'S90', 'XC40', 'XC60', 'XC90', 'C40', 'EX30', 'EX90']
+            }
         };
 
-        try {
-          // Client copy
-          await emailjs.send("service_r3e54ij", "template_b6axcp6", { ...templateParams, to_email: clientEmail }, "577XB4nzIHzauM_lg");
-          // Business owner copy
-          await emailjs.send("service_r3e54ij", "template_b6axcp6", { ...templateParams, to_email: "rodney@roblesconcreteservices.com" }, "577XB4nzIHzauM_lg");
-
-          setEmailSuccess(true); setEmailSending(false);
-          setTimeout(() => {
-            if (window.confirm("Emails sent successfully to both client and business owner! Start a new quote?")) {
-              resetForm();
+        // Service pricing structure
+        const servicePricing = {
+            'express-full': { 
+                sedan: 150, 
+                suv: 170, 
+                truck: 170, 
+                '3rdrow': 180,
+                coupe: 150,
+                convertible: 160,
+                hatchback: 150,
+                wagon: 160
+            },
+            'deluxe-full': { 
+                sedan: 250, 
+                suv: 270, 
+                truck: 270, 
+                '3rdrow': 280,
+                coupe: 250,
+                convertible: 260,
+                hatchback: 250,
+                wagon: 260
+            },
+            'express-interior': { 
+                sedan: 100, 
+                suv: 120, 
+                truck: 120, 
+                '3rdrow': 140,
+                coupe: 100,
+                convertible: 110,
+                hatchback: 100,
+                wagon: 110
+            },
+            'deluxe-interior': { 
+                sedan: 200, 
+                suv: 220, 
+                truck: 220, 
+                '3rdrow': 240,
+                coupe: 200,
+                convertible: 210,
+                hatchback: 200,
+                wagon: 210
+            },
+            'express-exterior': { 
+                sedan: 70, 
+                suv: 90, 
+                truck: 90, 
+                '3rdrow': 100,
+                coupe: 70,
+                convertible: 80,
+                hatchback: 70,
+                wagon: 80
+            },
+            'ceramic-coating': { 
+                sedan: 950, 
+                suv: 1150, 
+                truck: 1150, 
+                '3rdrow': 1250,
+                coupe: 950,
+                convertible: 1000,
+                hatchback: 950,
+                wagon: 1000
+            },
+            'paint-correction': { 
+                sedan: 400, 
+                suv: 500, 
+                truck: 500, 
+                '3rdrow': 550,
+                coupe: 400,
+                convertible: 450,
+                hatchback: 400,
+                wagon: 450
             }
-          }, 1200);
-        } catch (error) {
-          console.error("Email sending failed:", error);
-          setEmailError(`Failed to send email: ${error.text || error.message || "Unknown error"}`);
-          setEmailSending(false);
+        };
+
+        // Service descriptions
+        const serviceDescriptions = {
+            'express-full': 'Complete wash, dry, interior vacuum, dashboard wipe, window cleaning',
+            'deluxe-full': 'Full exterior detail, interior deep clean, seat shampoo, leather conditioning, UV protection',
+            'express-interior': 'Vacuum all surfaces, wipe dashboard, door panels, cup holders, glass cleaning',
+            'deluxe-interior': 'Deep vacuum, seat shampoo, leather treatment, carpet cleaning, odor elimination',
+            'express-exterior': 'Hand wash, rinse, chamois dry, tire shine, basic wax protection',
+            'ceramic-coating': 'Paint correction, surface preparation, ceramic coating application, curing',
+            'paint-correction': 'Single stage machine polishing, swirl removal, gloss enhancement'
+        };
+
+        // Generate years (current year back to 1990)
+        const currentYear = new Date().getFullYear();
+        for (let year = currentYear; year >= 1990; year--) {
+            carData.years.push(year);
         }
-      };
 
-      return (
-        <div className="min-h-screen bg-white">
-          {/* mobile header */}
-          <div className="block sm:hidden border-b border-neutral-200 bg-white px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="h-10 w-28 bg-neutral-100 rounded" />
-              <div className="flex items-center gap-2">
-                <button onClick={resetForm}
-                  className="border border-neutral-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-neutral-50 transition">Reset</button>
-                <button onClick={onLogout}
-                  className="border border-neutral-300 rounded-lg px-4 py-2 text-sm font-medium hover:bg-neutral-50 transition">Logout</button>
-              </div>
-            </div>
-          </div>
+        // Initialize dropdowns
+        function initializeDropdowns() {
+            // Populate year dropdown
+            const yearSelect = document.getElementById('year');
+            carData.years.forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                yearSelect.appendChild(option);
+            });
 
-          <ImageHeader />
+            // Populate make dropdown
+            const makeSelect = document.getElementById('make');
+            Object.keys(carData.makes).sort().forEach(make => {
+                const option = document.createElement('option');
+                option.value = make;
+                option.textContent = make;
+                makeSelect.appendChild(option);
+            });
+        }
 
-          {/* desktop header */}
-          <header className="hidden sm:block border-b border-neutral-200 bg-gradient-to-b from-neutral-50 to-white">
-            <div className="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <p className="uppercase text-xs tracking-widest text-neutral-500">Contractor Portal</p>
-                <h1 className="text-3xl font-semibold leading-tight">Floor Installation Pricing</h1>
-                <p className="text-neutral-500 text-sm mt-1">Robles Concrete Polishing &amp; Coatings</p>
-              </div>
-              <div className="w-full sm:w-auto grid grid-cols-1 gap-2 sm:flex sm:gap-2">
-                <button onClick={resetForm}
-                  className="w-full sm:w-auto border border-neutral-300 rounded-lg px-3 py-2 text-sm hover:bg-neutral-50">Reset Form</button>
-                <button onClick={onLogout}
-                  className="w-full sm:w-auto border border-neutral-300 rounded-lg px-3 py-2 text-sm hover:bg-neutral-50">Logout</button>
-              </div>
-            </div>
-          </header>
+        // Handle make selection to populate models
+        function handleMakeChange() {
+            const makeSelect = document.getElementById('make');
+            const modelSelect = document.getElementById('model');
+            modelSelect.innerHTML = '<option value="">Select Model</option>';
+            
+            if (makeSelect.value && carData.makes[makeSelect.value]) {
+                carData.makes[makeSelect.value].forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    modelSelect.appendChild(option);
+                });
+            }
+            updatePricing();
+        }
 
-          <main className="max-w-6xl mx-auto px-6 py-8 grid lg:grid-cols-3 gap-6">
-            {/* Left column */}
-            <section className="lg:col-span-2 space-y-6">
-              {/* Client info */}
-              <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                <div className="p-5 border-b border-neutral-200">
-                  <h3 className="text-lg font-semibold">Client Information</h3>
-                </div>
-                <div className="p-5 grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Client Name *</label>
-                    <input className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                           value={clientName} onChange={e=>setClientName(e.target.value)} placeholder="Name" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Client Email *</label>
-                    <input type="email"
-                           className={`w-full border rounded-xl px-3 py-2 bg-white ${clientEmail && !isValidEmail(clientEmail) ? "border-red-400" : "border-neutral-300"}`}
-                           value={clientEmail} onChange={e=>setClientEmail(e.target.value)} placeholder="email@example.com" required />
-                    {clientEmail && !isValidEmail(clientEmail) && (
-                      <p className="text-xs text-red-600 mt-1">Please enter a valid email address</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Company *</label>
-                    <input className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                           value={companyName} onChange={e=>setCompanyName(e.target.value)} placeholder="Company name" required />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Job Location *</label>
-                    <input className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                           value={companyLocation} onChange={e=>setCompanyLocation(e.target.value)} placeholder="City, State" required />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-neutral-700 mb-1">Project Name *</label>
-                    <input className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                           value={projectName} onChange={e=>setProjectName(e.target.value)} placeholder="Project name" required />
-                  </div>
-                </div>
-              </div>
+        // Calculate total additional charges from checkboxes
+        function calculateAdditionalCharges() {
+            let total = 0;
+            const checkboxes = ['pet-hair', 'trash-debris', 'dirt-grime', 'odor', 'mold', 'lifted-vehicle'];
+            
+            checkboxes.forEach(id => {
+                const checkbox = document.getElementById(id);
+                if (checkbox.checked) {
+                    total += parseInt(checkbox.value);
+                }
+            });
+            
+            return total;
+        }
 
-              {/* 1. Select Flooring Type */}
-              <div className="bg-gradient-to-b from-sky-100 to-white border border-sky-200 rounded-2xl shadow-sm">
-                <div className="p-5 border-b border-sky-200"><h3 className="text-lg font-semibold">1. Select Flooring Type</h3></div>
-                <div className="p-5 grid md:grid-cols-2 gap-3">
-                  {["Concrete", "Terrazzo"].map((t)=>(
-                    <button key={t} onClick={()=>{setFlooringType(t); resetAll();}}
-                      className={`px-4 py-3 rounded-2xl border text-base font-semibold transition ${flooringType===t?"bg-blue-600 text-white border-blue-600":"bg-white text-neutral-900 border-neutral-300 hover:bg-sky-50"}`}>{t}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Concrete path */}
-              {flooringType==="Concrete" && (
-                <div className="space-y-6">
-                  <div className="bg-gradient-to-b from-sky-100 to-white border border-sky-200 rounded-2xl shadow-sm">
-                    <div className="p-5 border-b border-sky-200"><h3 className="text-lg font-semibold">2. Concrete Condition</h3></div>
-                    <div className="p-5 grid md:grid-cols-2 gap-2">
-                      {["Newly poured (0-120 days)", "Existing"].map((v)=>(
-                        <button key={v} onClick={()=>{setConcreteAge(v); setLocation(""); setServiceType(""); setSqft(""); setRooms(""); setColor(""); setGloss(""); setEpoxySystem(""); setIntegralCove(""); setLinearFeet("");}}
-                          className={`px-4 py-2 rounded-xl border text-sm font-semibold ${concreteAge===v?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{v}</button>
-                      ))}
+        // Update pricing display
+        function updatePricing() {
+            const year = document.getElementById('year').value;
+            const make = document.getElementById('make').value;
+            const model = document.getElementById('model').value;
+            const bodyType = document.getElementById('bodyType').value;
+            const service = document.querySelector('input[name="service"]:checked');
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const basePriceElement = document.getElementById('basePrice');
+            const additionalPriceElement = document.getElementById('additionalPrice');
+            const totalPriceElement = document.getElementById('totalPrice');
+            const finalPriceElement = document.getElementById('finalPrice');
+            const serviceDetails = document.getElementById('serviceDetails');
+            
+            let basePrice = 0;
+            let serviceName = '';
+            let serviceDescription = '';
+            
+            if (year && make && model && bodyType && service) {
+                const serviceType = service.value;
+                const pricing = servicePricing[serviceType];
+                serviceName = service.nextElementSibling.textContent;
+                serviceDescription = serviceDescriptions[serviceType];
+                
+                if (pricing) {
+                    basePrice = pricing[bodyType] || pricing.sedan;
+                }
+                
+                const additionalCharges = calculateAdditionalCharges();
+                const totalPrice = basePrice + additionalCharges;
+                
+                // Update pricing display
+                basePriceElement.textContent = `$${basePrice.toFixed(2)}`;
+                additionalPriceElement.textContent = `$${additionalCharges.toFixed(2)}`;
+                totalPriceElement.textContent = `$${totalPrice.toFixed(2)}`;
+                finalPriceElement.textContent = `$${totalPrice.toFixed(2)}`;
+                
+                // Update service details
+                serviceDetails.innerHTML = `
+                    <div class="mb-4">
+                        <h4 class="font-medium text-white mb-2">${serviceName}</h4>
+                        <p class="text-slate-400">${serviceDescription}</p>
                     </div>
-                  </div>
-
-                  {concreteAge && (
-                    <div className="bg-gradient-to-b from-sky-100 to-white border border-sky-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-sky-200"><h3 className="text-lg font-semibold">3. Indoor or Outdoor?</h3></div>
-                      <div className="p-5 grid md:grid-cols-2 gap-2">
-                        {["Indoor", "Outdoor"].map((v)=>(
-                          <button key={v} onClick={()=>{setLocation(v); setServiceType(""); setSqft(""); setRooms(""); setColor(""); setGloss(""); setEpoxySystem(""); setIntegralCove(""); setLinearFeet("");}}
-                            className={`px-4 py-2 rounded-xl border text-sm font-semibold ${location===v?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{v}</button>
-                        ))}
-                      </div>
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-sm">
+                            <span>Vehicle:</span>
+                            <span class="text-white">${year} ${make} ${model}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span>Body Type:</span>
+                            <span class="text-white">${bodyType.charAt(0).toUpperCase() + bodyType.slice(1)}</span>
+                        </div>
                     </div>
-                  )}
+                `;
+                
+                submitBtn.disabled = false;
+            } else {
+                basePriceElement.textContent = '$0.00';
+                additionalPriceElement.textContent = '$0.00';
+                totalPriceElement.textContent = '$0.00';
+                finalPriceElement.textContent = '$0.00';
+                serviceDetails.innerHTML = '<p>Select a service package and vehicle details to see pricing breakdown.</p>';
+                submitBtn.disabled = true;
+            }
+        }
 
-                  {location==="Indoor" && (
-                    <div className="bg-gradient-to-b from-sky-100 to-white border border-sky-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-sky-200"><h3 className="text-lg font-semibold">4. Select Service</h3></div>
-                      <div className="p-5 grid md:grid-cols-2 gap-2">
-                        {["Polished Concrete","Sealed Concrete","Micro-Topping","Epoxy"].map((v)=>(
-                          <button key={v} onClick={()=>{setServiceType(v); setSqft(""); setRooms(""); setColor(""); setGloss(""); setEpoxySystem(""); setIntegralCove(""); setLinearFeet("");}}
-                            className={`px-4 py-2 rounded-xl border text-sm font-semibold ${serviceType===v?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{v}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        // Form validation
+        function validateForm() {
+            const requiredFields = [
+                'year', 'make', 'model', 'bodyType', 
+                'clientName', 'clientEmail', 'clientPhone', 
+                'preferredDateTime', 'serviceLocation'
+            ];
+            
+            const serviceSelected = document.querySelector('input[name="service"]:checked');
+            
+            let isValid = serviceSelected !== null;
+            
+            requiredFields.forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                if (!field.value.trim()) {
+                    isValid = false;
+                }
+            });
+            
+            document.getElementById('submitBtn').disabled = !isValid;
+        }
 
-                  {location==="Outdoor" && (
-                    <div className="bg-gradient-to-b from-sky-100 to-white border border-sky-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-sky-200"><h3 className="text-lg font-semibold">4. Select Service</h3></div>
-                      <div className="p-5 grid grid-cols-1 gap-2">
-                        {["Driveway Resurfacing"].map((v)=>(
-                          <button key={v} onClick={()=>{setServiceType(v); setSqft(""); setRooms("");}}
-                            className={`px-4 py-2 rounded-xl border text-sm font-semibold ${serviceType===v?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{v}</button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+        // Handle form submission
+        function handleFormSubmission(e) {
+            e.preventDefault();
+            
+            const formData = {
+                vehicle: {
+                    year: document.getElementById('year').value,
+                    make: document.getElementById('make').value,
+                    model: document.getElementById('model').value,
+                    bodyType: document.getElementById('bodyType').value
+                },
+                service: {
+                    type: document.querySelector('input[name="service"]:checked').value,
+                    name: document.querySelector('input[name="service"]:checked').nextElementSibling.textContent
+                },
+                pricing: {
+                    basePrice: document.getElementById('basePrice').textContent,
+                    additionalCharges: document.getElementById('additionalPrice').textContent,
+                    totalPrice: document.getElementById('totalPrice').textContent
+                },
+                client: {
+                    name: document.getElementById('clientName').value,
+                    email: document.getElementById('clientEmail').value,
+                    phone: document.getElementById('clientPhone').value,
+                    preferredDateTime: document.getElementById('preferredDateTime').value,
+                    serviceLocation: document.getElementById('serviceLocation').value,
+                    additionalNotes: document.getElementById('additionalNotes').value
+                },
+                additionalServices: []
+            };
 
-                  {serviceType==="Polished Concrete" && (
-                    <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">Polished Concrete Details</h3></div>
-                      <div className="p-5 space-y-4">
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Size in sq ft</label>
-                            <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                   value={sqft} onChange={(e)=>setSqft(e.target.value)} />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Number of Rooms</label>
-                            <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                   value={rooms} onChange={(e)=>setRooms(e.target.value)} />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Color</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[{k:"natural",l:"Natural"},{k:"stain",l:"Stain (+ surcharge)"}].map((o)=>(
-                              <button key={o.k} onClick={()=>setColor(o.k)}
-                                className={`px-3 py-2 rounded-xl border text-sm font-semibold ${color===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Grit Level</label>
-                          <div className="grid md:grid-cols-4 gap-2">
-                            {[{k:"grit_200",l:"200 Grit"},{k:"grit_400",l:"400 Grit"},{k:"grit_800",l:"800 Grit"},{k:"grit_1800",l:"1800 Grit"}].map((o)=>(
-                              <button key={o.k} onClick={()=>setGloss(o.k)}
-                                className={`px-3 py-2 rounded-xl border text-sm font-semibold ${gloss===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+            // Collect selected additional services
+            const additionalServices = ['pet-hair', 'trash-debris', 'dirt-grime', 'odor', 'mold', 'lifted-vehicle'];
+            additionalServices.forEach(serviceId => {
+                const checkbox = document.getElementById(serviceId);
+                if (checkbox.checked) {
+                    formData.additionalServices.push({
+                        service: checkbox.nextElementSibling.textContent,
+                        cost: checkbox.value
+                    });
+                }
+            });
+            
+            // Here you would typically send this data to your backend
+            console.log('Form Data:', formData);
+            
+            // Show success message
+            alert(`Thank you ${formData.client.name}! Your estimate for ${formData.vehicle.year} ${formData.vehicle.make} ${formData.vehicle.model} is ${formData.pricing.totalPrice}. We'll contact you shortly to confirm your appointment for ${new Date(formData.client.preferredDateTime).toLocaleString()}.`);
+        }
 
-                  {serviceType==="Sealed Concrete" && (
-                    <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">Sealed Concrete Details</h3></div>
-                      <div className="p-5 grid md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Size in sq ft</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={sqft} onChange={(e)=>setSqft(e.target.value)} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Number of Rooms</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={rooms} onChange={(e)=>setRooms(e.target.value)} />
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Color</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[{k:"natural",l:"Natural"},{k:"stain",l:"Stain (+ surcharge)"}].map((o)=>(
-                              <button key={o.k} onClick={()=>setColor(o.k)}
-                                className={`px-3 py-2 rounded-xl border text-sm font-semibold ${color===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeDropdowns();
+            
+            // Add event listeners
+            document.getElementById('make').addEventListener('change', handleMakeChange);
+            
+            // Add listeners for all form fields
+            const formElements = ['year', 'make', 'model', 'bodyType', 'clientName', 'clientEmail', 'clientPhone', 'preferredDateTime', 'serviceLocation'];
+            formElements.forEach(id => {
+                document.getElementById(id).addEventListener('change', () => {
+                    updatePricing();
+                    validateForm();
+                });
+                document.getElementById(id).addEventListener('input', () => {
+                    updatePricing();
+                    validateForm();
+                });
+            });
 
-                  {(serviceType==="Micro-Topping" || serviceType==="Driveway Resurfacing") && (
-                    <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">{serviceType} Details</h3></div>
-                      <div className="p-5 grid md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Size in sq ft</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={sqft} onChange={(e)=>setSqft(e.target.value)} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Number of Rooms</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={rooms} onChange={(e)=>setRooms(e.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
+            // Add listeners for service selection
+            const serviceInputs = document.querySelectorAll('input[name="service"]');
+            serviceInputs.forEach(input => {
+                input.addEventListener('change', () => {
+                    updatePricing();
+                    validateForm();
+                });
+            });
 
-                  {serviceType==="Epoxy" && (
-                    <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                      <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">Epoxy Details</h3></div>
-                      <div className="p-5 space-y-4">
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Size in sq ft</label>
-                            <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                   value={sqft} onChange={(e)=>setSqft(e.target.value)} />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Number of Rooms</label>
-                            <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                   value={rooms} onChange={(e)=>setRooms(e.target.value)} />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">System</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {[{k:"single",l:"Single Color"},{k:"metallic",l:"Metallic"},{k:"quartz",l:"Quartz"},{k:"flake",l:"Color Flake"}].map((o)=>(
-                              <button key={o.k} onClick={()=>setEpoxySystem(o.k)}
-                                className={`px-3 py-2 rounded-xl border text-sm font-semibold ${epoxySystem===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-neutral-700 mb-1">Integral Cove</label>
-                            <div className="grid grid-cols-2 gap-2">
-                              {[{k:"yes",l:"Yes"},{k:"no",l:"No"}].map((o)=>(
-                                <button key={o.k} onClick={()=>setIntegralCove(o.k)}
-                                  className={`px-3 py-2 rounded-xl border text-sm font-semibold ${integralCove===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                              ))}
-                            </div>
-                          </div>
-                          {integralCove==="yes" && (
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-1">Linear Feet</label>
-                              <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                     value={linearFeet} onChange={(e)=>setLinearFeet(e.target.value)} />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+            // Add listeners for additional service checkboxes
+            const additionalCheckboxes = ['pet-hair', 'trash-debris', 'dirt-grime', 'odor', 'mold', 'lifted-vehicle'];
+            additionalCheckboxes.forEach(id => {
+                document.getElementById(id).addEventListener('change', updatePricing);
+            });
 
-              {/* Terrazzo path */}
-              {flooringType==="Terrazzo" && (
-                <div className="space-y-6">
-                  <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                    <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">Terrazzo Details</h3></div>
-                    <div className="p-5 space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-700 mb-1">Chip Size</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[{k:"standard",l:"Standard"},{k:"large",l:"Large"}].map((o)=>(
-                            <button key={o.k} onClick={()=>setTzChip(o.k)} type="button"
-                              className={`px-3 py-2 rounded-xl border text-sm font-semibold ${tzChip===o.k?"bg-blue-600 text-white border-blue-600":"bg-white border-neutral-300 hover:bg-sky-50"}`}>{o.l}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Size in sq ft</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={tzSqft} onChange={(e)=>setTzSqft(e.target.value)} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-1">Number of Rooms</label>
-                          <input type="number" min="0" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white"
-                                 value={tzRooms} onChange={(e)=>setTzRooms(e.target.value)} />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Notes */}
-              {flooringType && (
-                <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                  <div className="p-5 border-b border-neutral-200"><h3 className="text-lg font-semibold">Additional Notes</h3></div>
-                  <div className="p-5">
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">Final Comments or Special Instructions</label>
-                    <textarea value={finalComments} onChange={(e)=>setFinalComments(e.target.value)}
-                              placeholder="Enter any special requests, timeline details, accessibility concerns, or other relevant information..."
-                              rows="4" className="w-full border border-neutral-300 rounded-xl px-3 py-2 bg-white text-neutral-900 placeholder-neutral-400 outline-none focus:ring-2 focus:ring-neutral-200 resize-none"></textarea>
-                    <p className="text-xs text-neutral-500 mt-2">Optional: Add any details that will help us prepare an accurate quote</p>
-                  </div>
-                </div>
-              )}
-            </section>
-
-            {/* Right column */}
-            <aside className="space-y-4">
-              <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm">
-                <div className="p-5 border-b border-neutral-200">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Send Quote</h3>
-                    {isAdmin && (<span className="text-xs font-semibold px-2 py-1 bg-green-100 text-green-800 rounded-full">ADMIN</span>)}
-                  </div>
-                </div>
-                <div className="p-5">
-                  <p className="text-neutral-500 text-sm">Quote will be emailed to client and business owner (rodney@roblesconcreteservices.com).</p>
-                  <div className="text-sm text-neutral-700 mt-3 space-y-1">
-                    <div><span className="font-semibold">Client:</span> {clientName || "-"}</div>
-                    <div><span className="font-semibold">Email:</span> {clientEmail || "-"}</div>
-                    <div><span className="font-semibold">Company:</span> {companyName || "-"}</div>
-                    <div><span className="font-semibold">Job Location:</span> {companyLocation || "-"}</div>
-                    <div><span className="font-semibold">Project:</span> {projectName || "-"}</div>
-                    <div><span className="font-semibold">Summary:</span> {summary || "-"}</div>
-                    {flooringType==="Terrazzo" && (
-                      <>
-                        {tzChip && (<div><span className="font-semibold">Chip Size:</span> {tzChip==="standard"?"Standard":"Large"}</div>)}
-                        {tzSqft && (<div><span className="font-semibold">Sq Ft:</span> {tzSqft}</div>)}
-                        {tzRooms && (<div><span className="font-semibold">Rooms:</span> {tzRooms}</div>)}
-                      </>
-                    )}
-                    {finalComments && (
-                      <div className="pt-2 border-t border-neutral-200 mt-2">
-                        <span className="font-semibold block mb-1">Comments:</span>
-                        <span className="text-neutral-600 text-xs leading-relaxed block whitespace-pre-wrap">{finalComments}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Live Pricing (Admin only) */}
-                  {isAdmin && (
-                    <div className="mt-4 pt-4 border-t border-neutral-200">
-                      <h4 className="text-sm font-semibold text-neutral-900 mb-3 flex items-center gap-2">
-                        <span className="text-green-600">💰</span>Live Pricing
-                      </h4>
-                      {priceLoading ? (
-                        <p className="text-sm text-neutral-500">Loading pricing data...</p>
-                      ) : !pricingData ? (
-                        <p className="text-sm text-red-600">Failed to load pricing data</p>
-                      ) : !calculatePrice() ? (
-                        <p className="text-sm text-neutral-500 italic">Fill out the form to see pricing</p>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="bg-neutral-50 rounded-lg p-3 space-y-2">
-                            {calculatePrice().breakdown.map((item, idx) => (
-                              <div key={idx} className="space-y-1">
-                                <div className="flex justify-between text-sm">
-                                  <span className="text-neutral-600">{item.label}</span>
-                                  <span className="font-medium text-neutral-900">
-                                    ${item.amount.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
-                                  </span>
-                                </div>
-                                {item.perSqft && (
-                                  <div className="text-xs text-neutral-500 pl-2">
-                                    ${item.perSqft.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}/sq ft x {item.sqft} sq ft
-                                  </div>
-                                )}
-                                {item.perUnit && (
-                                  <div className="text-xs text-neutral-500 pl-2">
-                                    ${item.perUnit.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}/{item.unit}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <div className="flex justify-between items-center pt-2 border-t border-neutral-300">
-                            <span className="text-base font-semibold text-neutral-900">Total</span>
-                            <span className="text-xl font-bold text-green-600">
-                              ${calculatePrice().total.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Success / error */}
-                  {emailSuccess && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-sm text-green-800 font-medium">✓ Emails sent successfully to client and business owner!</p>
-                    </div>
-                  )}
-                  {emailError && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-800">{emailError}</p>
-                      <button onClick={()=>setEmailError("")} className="text-xs text-red-600 underline mt-1">Dismiss</button>
-                    </div>
-                  )}
-
-                  <div className="mt-4 flex items-start gap-2">
-                    <input type="checkbox" id="disclaimer" checked={acceptDisclaimer}
-                           onChange={(e)=>setAcceptDisclaimer(e.target.checked)}
-                           className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-black focus:ring-2 focus:ring-neutral-300" />
-                    <label htmlFor="disclaimer" className="text-xs text-neutral-600 leading-tight cursor-pointer">
-                      Estimates provided are valid for a 75 mile radius around Central Atlanta.
-                    </label>
-                  </div>
-                  <button disabled={!canSend || emailSending} onClick={sendEmail}
-                          className={`w-full mt-4 font-semibold py-2 rounded-xl border transition ${
-                            canSend&&!emailSending ? "bg-black text-white border-black hover:bg-neutral-800" :
-                            "bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed"}`}>
-                    {emailSending ? "Sending..." : "Generate Email Quote"}
-                  </button>
-                </div>
-              </div>
-            </aside>
-          </main>
-
-          <Footer />
-        </div>
-      );
-    }
-
-    function Page() {
-      const PASSWORD = "FloorPro2024";
-      const ADMIN_PASSWORD = "Admin2024";
-
-      const [isAuthed, setIsAuthed] = useState(false);
-      const [isAdmin, setIsAdmin] = useState(false);
-      const [password, setPassword] = useState("");
-      const [error, setError] = useState("");
-
-      const tryLogin = () => {
-        if (!password) return setError("Please enter the password.");
-        const clean = password.trim();
-        if (clean === PASSWORD) { setIsAuthed(true); setIsAdmin(false); setError(""); }
-        else if (clean === ADMIN_PASSWORD) { setIsAuthed(true); setIsAdmin(true); setError(""); }
-        else { setError("Invalid password."); }
-      };
-
-      const handleLogout = () => { setIsAuthed(false); setIsAdmin(false); setPassword(""); setError(""); };
-
-      if (!isAuthed) {
-        return (
-          <div className="min-h-[70vh] bg-white text-neutral-900 font-sans">
-            <div className="max-w-md mx-auto mt-12 px-5">
-              <div className="border border-neutral-200 rounded-2xl shadow-sm p-6 bg-white">
-                <h1 className="text-2xl font-semibold mb-3">Contractor Login</h1>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">Password</label>
-                <input type="password" value={password}
-                       onChange={(e)=>setPassword(e.target.value)}
-                       onKeyDown={(e)=> e.key==="Enter" && tryLogin()}
-                       placeholder="Enter password"
-                       className="w-full border border-neutral-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-neutral-300 outline-none" />
-                {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
-                <button onClick={tryLogin}
-                        className="w-full mt-4 bg-black text-white font-semibold py-2 rounded-xl hover:bg-neutral-800 transition">
-                  Access Tool
-                </button>
-                <p className="text-xs text-neutral-500 mt-2 text-center">No password hints are shown.</p>
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      return <AppShell onLogout={handleLogout} isAdmin={isAdmin} />;
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<Page />);
-  </script>
+            // Add form submission handler
+            document.getElementById('submitBtn').addEventListener('click', handleFormSubmission);
+            
+            // Set minimum date for appointment scheduling (tomorrow)
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('preferredDateTime').min = tomorrow.toISOString().slice(0, 16);
+        });
+    </script>
 </body>
 </html>
